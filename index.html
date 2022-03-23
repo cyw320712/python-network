@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="shortcut icon" href="#" />
+    <title>Welcome to Storage Server!</title>
+  </head>
+  <style>
+    /* This is for html style. */
+    body {
+      text-align: center;
+    }
+    h1 {
+      margin: 100px;
+    }
+    h3 {
+      color: blue;
+    }
+    div {
+      margin: 20px auto;
+      width: 300px;
+    }
+    fieldset {
+      background-color: white;
+    }
+    input {
+      width: 90%;
+    }
+  </style>
+  <body>
+    <h1>Storage Server Login</h1>
+    <div>
+      <fieldset>
+        <legend>
+          <h3>Enter your ID and Password</h3>
+        </legend>
+        <!-- Implement login functionality -->
+        <form action="index" method="post">
+          User ID : <input type="text" name="id" placeholder="Your ID" /><br />
+          Password:<input
+            type="password"
+            name="pw"
+            placeholder="Your Password"
+          /><br /><br />
+          <input type="submit" value="Login" />
+        </form>
+      </fieldset>
+    </div>
+  </body>
+</html>
