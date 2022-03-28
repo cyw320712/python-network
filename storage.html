@@ -3,6 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="shortcut icon" href="#" />
+    <style>
+      .lm {
+        margin-left: 40px;
+      }
+    </style>
     <title>Storage</title>
   </head>
   <body>
@@ -10,7 +15,7 @@
       <!-- Specify user's name here -->
       <h1>&'s Storage Server</h1>
 
-      <form method="post">
+      <form action="storage" method="post" enctype="multipart/form-data">
         <input type="file" name="submitted_file" />
         <input type="submit" name="submit" />
       </form>
