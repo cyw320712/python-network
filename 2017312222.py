@@ -68,7 +68,7 @@ class SessionManager:
         super().__init__()
         self.info = {}
     
-    def create_session(self, csrftoken, userinfo):
+    def create_session(self, userinfo):
         data = {}
         data["start_time"] = datetime.datetime.now()
         data["status"] = 200
@@ -78,13 +78,13 @@ class SessionManager:
         except Exception:
             print("Already Participated User: Use exist data")
         data["user"] = user
-        self.info[csrftoken] = data
+        self.info = data
     
-    def get_user(self, csrftoken):
-        return self.info[csrftoken]["user"]
+    def get_user(self):
+        return self.info["user"]
 
-    def get_expire(self, csrftoken):
-        start = self.info[csrftoken]["start_time"]
+    def get_expire(self):
+        start = self.info["start_time"]
         cur = datetime.datetime.now()
         diff = cur - start
         remain = 120 - int(diff.total_seconds())
@@ -92,16 +92,17 @@ class SessionManager:
             return -1
         return str(remain)
 
-    def set_expire(self, csrftoken):
-        self.info[csrftoken]["status"] = 403
+    def set_expire(self):
+        self.info["status"] = 403
     
-    def get_status(self, csrftoken):
-        return self.info[csrftoken]["status"]
+    def get_status(self):
+        return self.info["status"]
 
-sessionManager = SessionManager()
+
 
 def serverThread(connectionSocket, addr):
     print('Connected by: ', addr[0], ':', addr[1])
+    sessionManager = SessionManager()
 
     raw = connectionSocket.recv(1024)
     data = raw.decode()
@@ -114,12 +115,6 @@ def serverThread(connectionSocket, addr):
     Header should aftercare for containing Cookie and '\r\n\r\n'
     """
     header = "HTTP/1.0 200 OK"
-
-    """
-    Parsing CSRF TOKEN for managing cookie
-    """
-    csrf_pos = data.find("csrftoken=")
-    csrftoken = data[csrf_pos+10:csrf_pos+74]
 
     """
     HTTP Method Parsing
@@ -139,25 +134,25 @@ def serverThread(connectionSocket, addr):
             header += "\r\n\r\n"
             connectionSocket.send((header+html).encode('utf-8'))
         elif route == "/cookie":
-            if sessionManager.get_status(csrftoken) == 403:
+            if sessionManager.get_status() == 403:
                 header = 'HTTP/1.0 403 Forbidden\r\n\r\n'
                 connectionSocket.send(header.encode('utf-8'))
-            elif sessionManager.get_expire(csrftoken) == -1:
+            elif sessionManager.get_expire() == -1:
                 file = open('./index.html', 'r', encoding='utf-8')
                 html = file.read()
                 header += "\r\n\r\n"
                 connectionSocket.send((header+html).encode('utf-8'))
-                sessionManager.set_expire(csrftoken)
+                sessionManager.set_expire()
             else:
                 userId = data.split("UserId=")[1].split("\r\n")[0]
                 header += "\r\n\r\n"
                 file = open('./cookie.html', 'r', encoding='utf-8')
                 html = file.read()
                 parselist = html.split("&")
-                html = parselist[0] + userId + parselist[1] + userId + parselist[2] + sessionManager.get_expire(csrftoken) + parselist[3]
+                html = parselist[0] + userId + parselist[1] + userId + parselist[2] + sessionManager.get_expire() + parselist[3]
                 connectionSocket.send((header+html).encode('utf-8'))
         elif route == "/storage":
-            User = sessionManager.get_user(csrftoken)
+            User = sessionManager.get_user()
             filelist = User.get_filelist()
             userId = data.split("UserId=")[1].split("\r\n")[0]
             header += "\r\n\r\n"
@@ -184,7 +179,7 @@ def serverThread(connectionSocket, addr):
                 header = "HTTP/1.0 302 Found"
                 header += "\nLocation: /storage"
                 header += "\r\n\r\n"
-                User = sessionManager.get_user(csrftoken)
+                User = sessionManager.get_user()
                 User.delete_file(filename)
                 print(header)
                 connectionSocket.send((header).encode('utf-8'))
@@ -199,7 +194,7 @@ def serverThread(connectionSocket, addr):
             if userId != targetId:
                 connectionSocket.send("HTTP/1.0 403 Forbidden\r\n\r\n".encode('utf-8'))
             else:
-                User = sessionManager.get_user(csrftoken)
+                User = sessionManager.get_user()
                 file_data, file_size = User.get_file(filename)
                 if file_data == "404":
                     connectionSocket.send("HTTP/1.0 404 Not Found\r\n\r\n".encode('utf-8'))
@@ -229,8 +224,8 @@ def serverThread(connectionSocket, addr):
             """
             Create Session for managing User Data
             """
-            sessionManager.create_session(csrftoken, [userId, userPw])
-            User = sessionManager.get_user(csrftoken)
+            sessionManager.create_session([userId, userPw])
+            User = sessionManager.get_user()
             filelist = User.get_filelist()
             header += "\nSet-Cookie: UserId=" + userId + "; expires=" + (datetime.datetime.now() + datetime.timedelta(seconds=60)).strftime('%A, %d-%m-%Y %H:%M:%S GMT') + ";\r\n\r\n"
             
@@ -283,8 +278,8 @@ def serverThread(connectionSocket, addr):
             
             uploaded = open("./"+userId+"/"+filename, "wb")
             uploaded.write(file_data)
-            sessionManager.get_user(csrftoken).upload_file(filename)
-            User = sessionManager.get_user(csrftoken)
+            sessionManager.get_user().upload_file(filename)
+            User = sessionManager.get_user()
             filelist = User.get_filelist()
 
             header = 'HTTP/1.0 200 OK\r\n\r\n'
@@ -299,7 +294,7 @@ def serverThread(connectionSocket, addr):
             parsedHtml += html[html.find("</ul>"):]
             connectionSocket.send((header+parsedHtml).encode('utf-8'))
 
-        connectionSocket.close()
+    connectionSocket.close()
 
 while True:
     connectionSocket, addr = serverSocket.accept()
