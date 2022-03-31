@@ -38,13 +38,11 @@ def send_notfound(connectionSocket):
 def serverThread(connectionSocket, addr):
     print(addr[0], ':', addr[1], '[INFO] Connected')
 
-    print("outer loop")
     while True:
         # try:
             data = connectionSocket.recv(2048).decode()
             # print(data)
             if not data:
-                print(addr[0], ':', addr[1], '[INFO] Disconnected')
                 connectionSocket.close()
                 break
 
@@ -52,7 +50,7 @@ def serverThread(connectionSocket, addr):
             route = headers[0].split(" ")[1]
             header = "HTTP/1.1 200 OK"
             method = find_method(data)
-            print(addr[0], ':', addr[1], '[INFO] requests', headers[0])
+            print(addr[0], ':', addr[1], '[INFO]', headers[0])
 
             if method == "GET":
                 if route == "/index":
