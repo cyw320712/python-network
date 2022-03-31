@@ -18,8 +18,6 @@ def replace(origin, target, dest):
     return origin
 
 def find_method(data):
-    if "LOGIN" in data:
-        return "LOGIN"
     if "POST" in data:
         return "POST"
     else:
@@ -38,7 +36,7 @@ def send_notfound(connectionSocket):
     connectionSocket.send(header.encode('utf-8'))
 
 def serverThread(connectionSocket, addr):
-    print('Connected by: ', addr[0], ':', addr[1])
+    print(addr[0], ':', addr[1], '[INFO] Connected')
 
     print("outer loop")
     while True:
@@ -46,7 +44,7 @@ def serverThread(connectionSocket, addr):
             data = connectionSocket.recv(2048).decode()
             # print(data)
             if not data:
-                print("pass")
+                print(addr[0], ':', addr[1], '[INFO] Disconnected')
                 connectionSocket.close()
                 break
 
@@ -54,30 +52,16 @@ def serverThread(connectionSocket, addr):
             route = headers[0].split(" ")[1]
             header = "HTTP/1.1 200 OK"
             method = find_method(data)
-            print(method)
+            print(addr[0], ':', addr[1], '[INFO] requests', headers[0])
 
             if method == "GET":
-                if route[0:6] == "/index":
-                    if len(route) == 6:
-                        file = open('./index.html', 'r', encoding='utf-8')
-                        html = file.read()
-                        file.close()
-                        header += "\nContent-Length: " + str(len(html))
-                        header += "\r\n\r\n"
-                        connectionSocket.send((header+html).encode('utf-8'))
-                    else:
-                        personal = data.split("id=")[1]
-                        userId = personal.split("&")[0]
-                        try:
-                            os.makedirs('./' + userId)
-                        except Exception:
-                            print("Already Participated User: Use exist data")
-                        header = "HTTP/1.1 302 Found"
-                        header += "\nContent-Length: 0"
-                        header += "\nSet-Cookie: UserId=" + userId + ";Max-Age=120;"
-                        header += "\nSet-Cookie: Start_time=" + datetime.datetime.now().strftime('%Y %m %d %H:%M:%S') + ";Max-Age=120;"
-                        header += "\nLocation: /storage\r\n\r\n"
-                        connectionSocket.send(header.encode('utf-8'))
+                if route == "/index":
+                    file = open('./index.html', 'r', encoding='utf-8')
+                    html = file.read()
+                    file.close()
+                    header += "\nContent-Length: " + str(len(html))
+                    header += "\r\n\r\n"
+                    connectionSocket.send((header+html).encode('utf-8'))
                 elif route == "/cookie":
                     if "UserId=" not in data:
                         send_forbidden(connectionSocket)
@@ -144,7 +128,7 @@ def serverThread(connectionSocket, addr):
                                 os.remove('./' + userId + '/' + result)
                             except FileNotFoundError:
                                 flag = "404"
-                                print(f"There is no such file: {result}")
+                                print(addr[0], ':', addr[1], "[ERROR] There is no such file")
 
                             if flag == "404":
                                 send_notfound(connectionSocket)
@@ -172,7 +156,7 @@ def serverThread(connectionSocket, addr):
                                 file.close()
                                 file_size = os.path.getsize('./' + userId + '/' + result)
                             except FileNotFoundError:
-                                print(f"There is no such file: {result}")
+                                print(addr[0], ':', addr[1], "[ERROR] There is no such file")
 
                             if file_data == "404":
                                 send_notfound(connectionSocket)
@@ -185,39 +169,19 @@ def serverThread(connectionSocket, addr):
                                 header += "\r\n\r\n"
                                 connectionSocket.send((header).encode('utf-8'))
                                 connectionSocket.send(file_data)
-                elif route[0] == "/":
-                    if len(route) == 1:
-                        file = open('./index.html', 'r', encoding='utf-8')
-                        html = file.read()
-                        file.close()
-                        header += "\nContent-Length: " + str(len(html))
-                        header += "\r\n\r\n"
-                        connectionSocket.send((header+html).encode('utf-8'))
-                    else:
-                        personal = data.split("id=")[1]
-                        userId = personal.split("&")[0]
-                        try:
-                            os.makedirs('./' + userId)
-                        except Exception:
-                            print("Already Participated User: Use exist data")
-                        header = "HTTP/1.1 302 Found"
-                        header += "\nContent-Length: 0"
-                        header += "\nSet-Cookie: UserId=" + userId + ";Max-Age=120;"
-                        header += "\nSet-Cookie: Start_time=" + datetime.datetime.now().strftime('%Y %m %d %H:%M:%S') + ";Max-Age=120;"
-                        header += "\nLocation: /storage\r\n\r\n"
-                        connectionSocket.send(header.encode('utf-8'))
                 else:
                     send_forbidden(connectionSocket)
             elif method == "POST":
                 if route == "/storage":
                     contentType = data.split("Content-Type: ")[1].split("\r\n")[0]
                     if contentType == "application/x-www-form-urlencoded" :
+                        # ~Login~
                         personal = data.split("id=")[1]
                         userId = personal.split("&")[0]
                         try:
                             os.makedirs('./' + userId)
                         except Exception:
-                            print("Already Participated User: Use exist data")
+                            print(addr[0], ':', addr[1], "[INFO] Existed User")
                         file = open('./storage.html', 'r', encoding='utf-8')
                         html = file.read()
                         file.close()
@@ -241,18 +205,23 @@ def serverThread(connectionSocket, addr):
                     else:
                         if "UserId=" not in data:
                             send_forbidden(connectionSocket)
+                            contentLength = data.split("Content-Length: ")[1].split("\r\n")[0]
+                            raw_data = connectionSocket.recv(2048)
+                            cur = 2048
+                            while cur <= int(contentLength):
+                                raw_data += connectionSocket.recv(2048)
+                                cur += 2048
                         else:
                             userId = data.split("UserId=")[1].split(";")[0]
                             contentLength = data.split("Content-Length: ")[1].split("\r\n")[0]
                             boundary = data.split("boundary=")[1].split("\r\n")[0]
-                            print(contentLength)
+                            print(addr[0], ':', addr[1], "[INFO] Upload Start")
 
                             raw_data = connectionSocket.recv(2048)
                             cur = 2048
                             while cur <= int(contentLength):
                                 raw_data += connectionSocket.recv(2048)
                                 cur += 2048
-                            print(len(raw_data))
                             i = 11
                             while str(raw_data[i-10:i]) != "b'filename=" + '"' + "'" and i < 200:
                                 i += 1
@@ -260,7 +229,6 @@ def serverThread(connectionSocket, addr):
                             while str(raw_data[j:j+1]) != "b'" + '"' + "'" and j < 200:
                                 j += 1
                             filename = raw_data[i:j]
-                            
                             i = j + 1
                             while str(raw_data[i-4:i]) != "b'\\r\\n\\r\\n'" and i < 800:
                                 i += 1
@@ -270,11 +238,9 @@ def serverThread(connectionSocket, addr):
                                 j += 1
                             
                             file_data = raw_data[i:j-2]
-                            print("parsing complete")
                             uploaded = open("./"+userId+"/"+str(filename)[2:-1], "wb")
                             uploaded.write(file_data)
                             uploaded.close()
-                            print("write complete")
                             for path, dirs, files in os.walk("./"+userId):
                                 filelist = files
 
@@ -283,7 +249,7 @@ def serverThread(connectionSocket, addr):
                             file.close()
                             parselist = html.split("&")
                             html = parselist[0] + userId + parselist[1]
-
+                            
                             parsedHtml = html[0:html.find("<ul>")] + "<ul>\n"
                             for item in filelist:
                                 parsedHtml += '<li><div>' + item
@@ -294,6 +260,7 @@ def serverThread(connectionSocket, addr):
                             header += "\nContent-Length: " + str(len(parsedHtml))
                             header += "\r\n\r\n"
                             connectionSocket.send((header+parsedHtml).encode('utf-8'))
+                            print(addr[0], ':', addr[1], "[INFO] Upload End")
 
 while True:
     connectionSocket, addr = serverSocket.accept()
