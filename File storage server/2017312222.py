@@ -36,8 +36,6 @@ def send_notfound(connectionSocket):
     connectionSocket.send(header.encode('utf-8'))
 
 def serverThread(connectionSocket, addr):
-    print(addr[0], ':', addr[1], '[INFO] Connected')
-
     while True:
         # try:
             data = connectionSocket.recv(2048).decode()
@@ -262,6 +260,5 @@ def serverThread(connectionSocket, addr):
 
 while True:
     connectionSocket, addr = serverSocket.accept()
-    print('accepting')
     start_new_thread(serverThread, (connectionSocket, addr))
     
