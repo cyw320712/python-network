@@ -17,6 +17,6 @@ except Exception:
   print("file not found")
   sys.exit(1)
 
-message, addr = recv_sock.recvfrom(1)
+message, addr = recv_sock.recvfrom(1024)
 file.write(message)
 file.close()
