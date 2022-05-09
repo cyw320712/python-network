@@ -6,6 +6,8 @@ from checksum import calculate_checksum
 from PA2_Tools.PASender import PASender
 import socket
 
+PAYLOAD_SIZE = 1016
+
 if __name__ == '__main__':
   try:
     dst_addr = sys.argv[1]
@@ -35,38 +37,52 @@ if __name__ == '__main__':
   seq = 0
   dst_port = 10090
   src_port = 10091
-
-  while pos <= file_len:
-    if pos < file_len:
-      segment = file_data[pos:pos+window_size]
+  flag = False
+  
+  print("RDT Start")
+  while True:
+    if pos+PAYLOAD_SIZE < file_len:
+      segment = file_data[pos:pos+PAYLOAD_SIZE]
+    elif pos < file_len:
+      segment = file_data[pos:]
     else:
+      # end 조건 다시 만들기
       segment = b"\r\n\r\n"
-    pos += window_size
-    packet_len = 8 + len(segment)
-    header = struct.pack('!4H', src_port, dst_port, packet_len, 0)
+      flag = True
+    
+    pos += PAYLOAD_SIZE
+    header = struct.pack('!4H', src_port, dst_port, seq, 0)
     checksum = calculate_checksum(header)
-    header = struct.pack('!4H', src_port, dst_port, packet_len, checksum)
+    header = struct.pack('!4H', src_port, dst_port, seq, checksum)
+    # header에는 src_port, dst_port, sequence number, checksum이 포함된다.
 
     ack = False
     first = True
     while not ack:
+      ###########################################################
+      # Sending Part                                            #
+      ###########################################################
       sender.sendto_bytes(header + segment, (dst_addr, dst_port))
       if first:
+        # 처음 보낼때는 packet은 재전송이 아니니까.
         log_handler.writePkt(seq, log_handler.SEND_DATA)
         first = False
       else:
         log_handler.writePkt(seq, log_handler.SEND_DATA_AGAIN)
       
-      message, addr = sock.recvfrom(4096)
-      
+      ###########################################################
+      # Receiving Part                                          #
+      ###########################################################
+      message, addr = sock.recvfrom(1024)
       recv_header = message[:8]
+      recv_seq = message[4:6]
       recv_checksum = message[6:8]
       recv_content = message[8:]
+      ack_seq = struct.unpack('!H', recv_seq)[0]
 
       calculated = calculate_checksum(recv_header).to_bytes(2, "big")
       if calculated == recv_checksum:
         # 문제 없으면
-        ack_seq = str(recv_content[3:])[2]
         if str(ack_seq) == str(seq):
           ack = True
           log_handler.writePkt(seq, log_handler.SUCCESS_ACK)
@@ -75,9 +91,11 @@ if __name__ == '__main__':
       else:
         # 데이터가 틀리면
         log_handler.writePkt(seq, log_handler.CORRUPTED)
-        
     
     seq = 1 - seq
+    if flag:
+      break
 
   sock.close()
   log_handler.writeEnd()
+  print("RDT end")
