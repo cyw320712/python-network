@@ -27,7 +27,7 @@ if __name__ == '__main__':
   file.close()
 
   send_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-  sender = PASender(send_sock, loss_rate=0, corrupt_rate=0)
+  sender = PASender(send_sock, config_file='./config.txt')
   log_handler.writePkt(0, log_handler.SEND_DATA)
   sender.sendto(file_data, (dst_addr, 10090))
   send_sock.close()
