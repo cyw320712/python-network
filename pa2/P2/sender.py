@@ -32,7 +32,7 @@ if __name__ == '__main__':
   file.close()
   
   sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-  sender = PASender(sock, loss_rate=0, corrupt_rate=0)
+  sender = PASender(sock, config_file="./config.txt")
   pos = 0
   seq = 0
   dst_port = 10090
