@@ -32,16 +32,18 @@ if __name__ == '__main__':
   while True:
     message, addr = sock.recvfrom(1024)
     
-    recv_header = message[:8]
+    recv_header = message[:6]
     recv_seq = message[4:6]
     recv_checksum = message[6:8]
     recv_content = message[8:]
     recv_seq = struct.unpack('!H', recv_seq)[0]
+    zero_byte = 0
+    zero_byte = zero_byte.to_bytes(2, "big")
 
     if recv_content == b'\r\n\r\n':
       flag = True
     
-    calculated = calculate_checksum(recv_header).to_bytes(2, "big")
+    calculated = calculate_checksum(recv_header + zero_byte + recv_content).to_bytes(2, "big")
     CORRECT = False
     if calculated == recv_checksum:
       # 문제 없으면
@@ -58,7 +60,7 @@ if __name__ == '__main__':
       # 기다리던 sequence number가 왔으며, 문제가 없다면
       segment = ("ACK"+str(expecting_seq)).encode()
       header = struct.pack('!4H', src_port, dst_port, expecting_seq, 0)
-      checksum = calculate_checksum(header)
+      checksum = calculate_checksum(header+segment)
       header = struct.pack('!4H', src_port, dst_port, expecting_seq, checksum)
 
       sender.sendto_bytes(header + segment, addr)
@@ -74,7 +76,7 @@ if __name__ == '__main__':
       negative_seq = 1-expecting_seq
       segment = ("ACK"+str(negative_seq)).encode()
       header = struct.pack('!4H', src_port, dst_port, negative_seq, 0)
-      checksum = calculate_checksum(header)
+      checksum = calculate_checksum(header+segment)
       header = struct.pack('!4H', src_port, dst_port, negative_seq, checksum)
 
       sender.sendto(header + segment, addr)

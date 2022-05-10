@@ -54,7 +54,7 @@ if __name__ == '__main__':
     
     pos += PAYLOAD_SIZE
     header = struct.pack('!4H', src_port, dst_port, seq, 0)
-    checksum = calculate_checksum(header)
+    checksum = calculate_checksum(header+segment)
     header = struct.pack('!4H', src_port, dst_port, seq, checksum)
     # header에는 src_port, dst_port, sequence number, checksum이 포함된다.
 
@@ -81,20 +81,21 @@ if __name__ == '__main__':
         message, addr = sock.recvfrom(1024)
       except TimeoutError:
         # Timeout 된다면 log만 남기고 무시
-        print("timeout")
         log_handler.writeTimeout(seq)
         timeout = True
         sock.settimeout(0.01)
         continue
       
       if not timeout:
-        recv_header = message[:8]
+        recv_header = message[:6]
         recv_seq = message[4:6]
         recv_checksum = message[6:8]
         recv_content = message[8:]
         ack_seq = struct.unpack('!H', recv_seq)[0]
+        zero_byte = 0
+        zero_byte = zero_byte.to_bytes(2, "big")
 
-        calculated = calculate_checksum(recv_header).to_bytes(2, "big")
+        calculated = calculate_checksum(recv_header + zero_byte + recv_content).to_bytes(2, "big")
         if calculated == recv_checksum:
           # 문제 없으면
           if str(ack_seq) == str(seq):
@@ -102,7 +103,6 @@ if __name__ == '__main__':
             log_handler.writePkt(seq, log_handler.SUCCESS_ACK)
             seq = 1 - seq
           else:
-            print(f"acked: {ack_seq} vs expect: {seq}")
             log_handler.writePkt(seq, log_handler.WRONG_SEQ_NUM)
         else:
           # 데이터가 틀리면
