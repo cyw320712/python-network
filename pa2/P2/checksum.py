@@ -14,6 +14,5 @@ def calculate_checksum(header):
 
   checksum = (checksum >> 16) + (checksum & 0xffff)
   checksum += (checksum >> 16)
-
   checksum = ~checksum & 0xffff
   return checksum
