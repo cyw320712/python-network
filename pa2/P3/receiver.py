@@ -78,7 +78,7 @@ if __name__ == '__main__':
       header = struct.pack('!4H', src_port, dst_port, negative_seq, checksum)
 
       sender.sendto(header + segment, addr)
-      log_handler.writeAck(expecting_seq, log_handler.SEND_ACK_AGAIN)
+      log_handler.writeAck(negative_seq, log_handler.SEND_ACK_AGAIN)
 
     if flag:
       break

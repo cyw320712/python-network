@@ -1,5 +1,6 @@
 import struct
 import sys, os
+import time
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from PA2_Tools.logHandler import logHandler
 from checksum import calculate_checksum
@@ -19,6 +20,8 @@ if __name__ == '__main__':
     print("python sender.py <receiver's IP address> <window size> <source file name> <log file name>")
     sys.exit(1)
 
+  dst_port = 10090
+  src_port = 10091
   log_handler = logHandler()
   log_handler.startLogging(log_filename)
   try:
@@ -32,13 +35,12 @@ if __name__ == '__main__':
   file.close()
   
   sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-  sender = PASender(sock, loss_rate=0, corrupt_rate=0)
-  pos = 0
+  sock.settimeout(0.01)
+  sender = PASender(sock, config_file="./config.txt")
+
+  pos = 1
   seq = 0
-  dst_port = 10090
-  src_port = 10091
   flag = False
-  
   print("RDT Start")
   while True:
     if pos+PAYLOAD_SIZE < file_len:
@@ -58,6 +60,7 @@ if __name__ == '__main__':
 
     ack = False
     first = True
+
     while not ack:
       ###########################################################
       # Sending Part                                            #
@@ -73,26 +76,38 @@ if __name__ == '__main__':
       ###########################################################
       # Receiving Part                                          #
       ###########################################################
-      message, addr = sock.recvfrom(1024)
-      recv_header = message[:8]
-      recv_seq = message[4:6]
-      recv_checksum = message[6:8]
-      recv_content = message[8:]
-      ack_seq = struct.unpack('!H', recv_seq)[0]
+      timeout = False
+      try:
+        message, addr = sock.recvfrom(1024)
+      except TimeoutError:
+        # Timeout 된다면 log만 남기고 무시
+        print("timeout")
+        log_handler.writeTimeout(seq)
+        timeout = True
+        sock.settimeout(0.01)
+        continue
+      
+      if not timeout:
+        recv_header = message[:8]
+        recv_seq = message[4:6]
+        recv_checksum = message[6:8]
+        recv_content = message[8:]
+        ack_seq = struct.unpack('!H', recv_seq)[0]
 
-      calculated = calculate_checksum(recv_header).to_bytes(2, "big")
-      if calculated == recv_checksum:
-        # 문제 없으면
-        if str(ack_seq) == str(seq):
-          ack = True
-          log_handler.writePkt(seq, log_handler.SUCCESS_ACK)
+        calculated = calculate_checksum(recv_header).to_bytes(2, "big")
+        if calculated == recv_checksum:
+          # 문제 없으면
+          if str(ack_seq) == str(seq):
+            ack = True
+            log_handler.writePkt(seq, log_handler.SUCCESS_ACK)
+            seq = 1 - seq
+          else:
+            print(f"acked: {ack_seq} vs expect: {seq}")
+            log_handler.writePkt(seq, log_handler.WRONG_SEQ_NUM)
         else:
-          log_handler.writePkt(seq, log_handler.WRONG_SEQ_NUM)
-      else:
-        # 데이터가 틀리면
-        log_handler.writePkt(seq, log_handler.CORRUPTED)
+          # 데이터가 틀리면
+          log_handler.writePkt(seq, log_handler.CORRUPTED)
     
-    seq = 1 - seq
     if flag:
       break
 
