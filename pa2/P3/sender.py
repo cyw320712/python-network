@@ -83,9 +83,8 @@ if __name__ == '__main__':
         # Timeout 된다면 log만 남기고 무시
         log_handler.writeTimeout(seq)
         timeout = True
-        sock.settimeout(0.01)
         continue
-      
+        
       if not timeout:
         recv_header = message[:6]
         recv_seq = message[4:6]
