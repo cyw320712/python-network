@@ -10,10 +10,11 @@ def calculate_checksum(header):
     header += struct.pack('!B', 0)
   
   for i in range(0, length, 2):
-    checksum += (header[i + 1]) << 8 + header[i]
+    checksum += (header[i + 1] << 8) + header[i]
+    checksum += (checksum >> 16)
 
-  checksum = (checksum >> 16) + (checksum & 0xffff)
-  checksum += (checksum >> 16)
+  while (checksum >> 16) > 0:
+    checksum = (checksum >> 16) + (checksum & 0xffff)
 
   checksum = ~checksum & 0xffff
   return checksum

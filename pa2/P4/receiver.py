@@ -26,26 +26,32 @@ if __name__ == '__main__':
   expecting_seq = 0
   src_port = 10090
   dst_port = 10091
+  window_size = 0
 
-  flag = False
   print("RDT Start")
   while True:
-    message, addr = sock.recvfrom(1024)
+    message, addr = sock.recvfrom(1048)
     
-    recv_header = message[:8]
-    recv_seq = message[4:6]
-    recv_checksum = message[6:8]
-    recv_content = message[8:]
-    recv_seq = struct.unpack('!H', recv_seq)[0]
+    recv_header = struct.unpack('!6H', message[:12])
+    src_port = recv_header[0]
+    dst_port = recv_header[1]
+    recv_seq = recv_header[2]
+    window_size = recv_header[3]
+    recv_isFin = recv_header[4]
+    recv_checksum = recv_header[5]
+    recv_header = struct.pack('!6H', src_port, dst_port, recv_seq, window_size, recv_isFin, 0)
+    recv_content = message[12:]
 
-    if recv_content == b'\r\n\r\n':
-      flag = True
-    
-    calculated = calculate_checksum(recv_header).to_bytes(2, "big")
+    if recv_isFin == 1:
+      break
+
+    calculated = calculate_checksum(recv_header + recv_content)
+    print(f"checksum: {calculated} vs {recv_checksum}")
+    print(f"sequence: {expecting_seq} vs {recv_seq}")
     CORRECT = False
     if calculated == recv_checksum:
       # 문제 없으면
-      if str(expecting_seq) == str(recv_seq):
+      if expecting_seq == recv_seq:
         CORRECT = True
       else:
         log_handler.writeAck(expecting_seq, log_handler.WRONG_SEQ_NUM)
@@ -58,30 +64,27 @@ if __name__ == '__main__':
       # 기다리던 sequence number가 왔으며, 문제가 없다면
       segment = ("ACK"+str(expecting_seq)).encode()
       header = struct.pack('!4H', src_port, dst_port, expecting_seq, 0)
-      checksum = calculate_checksum(header)
+      checksum = calculate_checksum(header+segment)
       header = struct.pack('!4H', src_port, dst_port, expecting_seq, checksum)
 
       sender.sendto_bytes(header + segment, addr)
       log_handler.writeAck(expecting_seq, log_handler.SEND_ACK)
 
-      if not flag:
-        # 마지막 \r\n\r\n은 파일에 적지 않는다
-        file.write(recv_content)
+      file.write(recv_content)
       
-      expecting_seq = 1 - expecting_seq
+      expecting_seq += 1
+      expecting_seq %= window_size
     else:
+      print("========================================")
       # 기다리던 sequence number가 아니거나, corrupt 됐으면
-      negative_seq = 1-expecting_seq
-      segment = ("ACK"+str(negative_seq)).encode()
-      header = struct.pack('!4H', src_port, dst_port, negative_seq, 0)
-      checksum = calculate_checksum(header)
-      header = struct.pack('!4H', src_port, dst_port, negative_seq, checksum)
+      segment = ("ACK"+str(expecting_seq)).encode()
+      header = struct.pack('!4H', src_port, dst_port, expecting_seq, 0)
+      checksum = calculate_checksum(header+segment)
+      header = struct.pack('!4H', src_port, dst_port, expecting_seq, checksum)
 
       sender.sendto(header + segment, addr)
-      log_handler.writeAck(negative_seq, log_handler.SEND_ACK_AGAIN)
-
-    if flag:
-      break
+      log_handler.writeAck(expecting_seq, log_handler.SEND_ACK_AGAIN)
+      
   
   sock.close()
   file.close()
