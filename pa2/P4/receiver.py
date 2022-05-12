@@ -41,46 +41,41 @@ if __name__ == '__main__':
     recv_checksum = recv_header[5]
     recv_header = struct.pack('!6H', src_port, dst_port, recv_seq, window_size, recv_isFin, 0)
     recv_content = message[12:]
-
     if recv_isFin == 1:
       break
 
     calculated = calculate_checksum(recv_header + recv_content)
-    print(f"checksum: {calculated} vs {recv_checksum}")
-    print(f"sequence: {expecting_seq} vs {recv_seq}")
-    CORRECT = False
+    STATUS = 0
     if calculated == recv_checksum:
       # 문제 없으면
       if expecting_seq == recv_seq:
-        CORRECT = True
+        STATUS = 1
       else:
-        log_handler.writeAck(expecting_seq, log_handler.WRONG_SEQ_NUM)
-        CORRECT = False
+        log_handler.writeAck(recv_seq, log_handler.WRONG_SEQ_NUM)
+        STATUS = 0
     else:
       # Corrupted 됐다면
       log_handler.writeAck(expecting_seq, log_handler.CORRUPTED)
     
-    if CORRECT:
+    if STATUS:
       # 기다리던 sequence number가 왔으며, 문제가 없다면
       segment = ("ACK"+str(expecting_seq)).encode()
-      header = struct.pack('!4H', src_port, dst_port, expecting_seq, 0)
+      header = struct.pack('!5H', src_port, dst_port, expecting_seq, STATUS, 0)
       checksum = calculate_checksum(header+segment)
-      header = struct.pack('!4H', src_port, dst_port, expecting_seq, checksum)
+      header = struct.pack('!5H', src_port, dst_port, expecting_seq, STATUS, checksum)
 
       sender.sendto_bytes(header + segment, addr)
       log_handler.writeAck(expecting_seq, log_handler.SEND_ACK)
 
       file.write(recv_content)
-      
       expecting_seq += 1
       expecting_seq %= window_size
     else:
-      print("========================================")
       # 기다리던 sequence number가 아니거나, corrupt 됐으면
       segment = ("ACK"+str(expecting_seq)).encode()
-      header = struct.pack('!4H', src_port, dst_port, expecting_seq, 0)
+      header = struct.pack('!5H', src_port, dst_port, expecting_seq, STATUS, 0)
       checksum = calculate_checksum(header+segment)
-      header = struct.pack('!4H', src_port, dst_port, expecting_seq, checksum)
+      header = struct.pack('!5H', src_port, dst_port, expecting_seq, STATUS, checksum)
 
       sender.sendto(header + segment, addr)
       log_handler.writeAck(expecting_seq, log_handler.SEND_ACK_AGAIN)
