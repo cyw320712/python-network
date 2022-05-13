@@ -40,6 +40,7 @@ def sendPacket(sender, pos, packet_len, dst, window_size):
 
 
 if __name__ == '__main__':
+  # 사용자 입력 파라미터 받아오기
   try:
     dst_addr = sys.argv[1]
     window_size = int(sys.argv[2])
@@ -50,31 +51,36 @@ if __name__ == '__main__':
     print("python sender.py <receiver's IP address> <window size> <source file name> <log file name>")
     sys.exit(1)
 
-  dst_port = 10090
-  log_handler.startLogging(log_filename)
+  # Packet 개수를 정하는 과정
+  file_size = os.path.getsize(src_filename)
+  packet_len = file_size // PAYLOAD_SIZE + 1
+
+  # Target 파일 찾아서 열기
   try:
     file = open(src_filename, 'rb')
   except Exception:
     print("file not found")
     sys.exit(1)
-  # sock.bind((dst_addr, dst_port))
 
+  # file data를 나눠 packet data로 저장
   file_data = file.read(PAYLOAD_SIZE)
-  file_size = os.path.getsize(src_filename)
-  packet_len = file_size // PAYLOAD_SIZE + 1
-
   while file_data:
     packet_list.append(file_data)
     file_data = file.read(PAYLOAD_SIZE)
     window.append(-1)
   file.close()
 
+  # Sender 및 각종 변수 초기화
   sender = PASender(sock, config_file="./config.txt")
-  print("RDT Start")
+  log_handler.startLogging(log_filename)
+  dst_port = 10090
   pos = 0
   flag = False
   sequence_size = window_size * 2 + 1
   processed = -1
+  
+  # RDT를 위한 통신 Loop
+  print("RDT Start")
   while not flag:
     #########################################
     #                Send Pkt               #
@@ -92,11 +98,15 @@ if __name__ == '__main__':
     pos = cur_window
     while True:
       expecting_seq = (pos + cnt) % sequence_size
-      # print(f"====receiver====\n{window}")
+
       if cur_window >= packet_len:
+        # 현재 윈도우가 마지막 Packet에 도달했다면, 모든 패킷을 제대로 보냈다는 뜻
+        # 떄문에 종료조건 set 후 break
         flag = True
         break
       if (pos + cnt) >= packet_len:
+        # 여기서 멈추면 안되는 이유가
+        # 바로 멈추면 마지막 윈도우에서 loss 발생시 handling을 할 수 없음
         continue
       try:
         message, addr = sock.recvfrom(1024)
@@ -106,6 +116,7 @@ if __name__ == '__main__':
         log_handler.writeTimeout(expecting_seq)
         break
       
+      # 헤더 파싱해서 각각 저장 후 checksum 계산을 위해 다시 Pack
       recv_header =  struct.unpack('!5H', message[:10])
       src_port = recv_header[0]
       dst_port = recv_header[1]
@@ -114,7 +125,10 @@ if __name__ == '__main__':
       recv_checksum = recv_header[4]
       recv_header = struct.pack('!5H', src_port, dst_port, recv_seq, recv_status, 0)
       recv_content = message[10:]
+
+      # Checksum 계산
       calculated = calculate_checksum(recv_header + recv_content)
+
       if calculated == recv_checksum:
         # 데이터에 corrupt가 발생하지 않으면
         if recv_status:
@@ -147,13 +161,13 @@ if __name__ == '__main__':
         log_handler.writePkt(expecting_seq, log_handler.CORRUPTED)
         break
       
+      # 받으려고 시도한 횟수 +1
       cnt += 1
-      
-    shift = 0
-    while pos + shift < packet_len and window[pos+shift] == 1:
-      shift += 1
-    pos += shift
+    
+    # ACK된 연속된 패킷으로 윈도우 옮기기
+    pos = cur_window
 
+  # RDT Loop에서 나온 후 socket, logger 종료 파트
   sock.close()
   log_handler.writeEnd()
   print("RDT end")
