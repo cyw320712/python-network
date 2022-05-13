@@ -113,7 +113,6 @@ if __name__ == '__main__':
         first = False
       except TimeoutError:
         # 이번 윈도우의 마지막 packet에 대한 recv 요청에서 timeout이 뜬다면
-        log_handler.writeTimeout(expecting_seq)
         break
       
       # 헤더 파싱해서 각각 저장 후 checksum 계산을 위해 다시 Pack
@@ -154,6 +153,7 @@ if __name__ == '__main__':
             # ReACK이면서 expecting_Seq이면? wrong seq num이지만
             # timeout에 의한 wrong seq num일 수 있기 때문에 구분 할 수 없다
             # 때문에 로그는 남기지 않고, 중복처리를 방지하기 위한 장치만 추가
+            log_handler.writeTimeout(expecting_seq)
             processed = recv_seq
             continue
       else:
