@@ -39,14 +39,14 @@ if __name__ == '__main__':
     recv_seq = struct.unpack('!H', recv_seq)[0]
     zero_byte = 0
     zero_byte = zero_byte.to_bytes(2, "big")
-
-    if recv_content == b'\r\n\r\n':
-      flag = True
     
     calculated = calculate_checksum(recv_header + zero_byte + recv_content).to_bytes(2, "big")
     CORRECT = False
     if calculated == recv_checksum:
       # 문제 없으면
+      
+      if recv_content == b'\r\n\r\n':
+        flag = True
       if str(expecting_seq) == str(recv_seq):
         CORRECT = True
       else:
