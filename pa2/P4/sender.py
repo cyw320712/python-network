@@ -1,7 +1,5 @@
 import struct
 import sys, os
-import time
-import threading
 sys.path.append(os.path.dirname(os.path.abspath(os.path.dirname(__file__))))
 from PA2_Tools.logHandler import logHandler
 from checksum import calculate_checksum
@@ -16,23 +14,21 @@ log_handler = logHandler()
 packet_list = []
 window = []
 
-
 # pos 번째 packet만 전송
 def sendPacket(sender, pos, packet_len, dst, window_size):
   # print(f"====sender====\n{window}")
   dst_addr = dst[0]
   dst_port = dst[1]
-  fin = 0
-
-  seq = pos % window_size
+  sequence_size = window_size * 2 + 1
+  seq = pos % sequence_size
   if pos < packet_len:
     segment = packet_list[pos]
   else:
     return
   
-  header = struct.pack('!6H', src_port, dst_port, seq, window_size, fin, 0)
+  header = struct.pack('!6H', src_port, dst_port, seq, window_size, packet_len, 0)
   checksum = calculate_checksum(header+segment)
-  header = struct.pack('!6H', src_port, dst_port, seq, window_size, fin, checksum)
+  header = struct.pack('!6H', src_port, dst_port, seq, window_size, packet_len, checksum)
   
   sender.sendto_bytes(header + segment, (dst_addr, dst_port))
   if window[pos] == -1:
@@ -77,7 +73,7 @@ if __name__ == '__main__':
   print("RDT Start")
   pos = 0
   flag = False
-  
+  sequence_size = window_size * 2 + 1
   processed = -1
   while not flag:
     #########################################
@@ -95,20 +91,19 @@ if __name__ == '__main__':
     flag = False
     pos = cur_window
     while True:
-      expecting_seq = (pos + cnt) % window_size
-      # print(f"{expecting_seq}")
+      expecting_seq = (pos + cnt) % sequence_size
       # print(f"====receiver====\n{window}")
-      if (pos + cnt) >= packet_len:
+      if cur_window >= packet_len:
         flag = True
         break
+      if (pos + cnt) >= packet_len:
+        continue
       try:
         message, addr = sock.recvfrom(1024)
         first = False
       except TimeoutError:
-        cnt += 1
-        if first:
-          # 첫 번째 패킷의 timeout에 대해서만 로그 남기기
-          log_handler.writeTimeout(expecting_seq)
+        # 이번 윈도우의 마지막 packet에 대한 recv 요청에서 timeout이 뜬다면
+        log_handler.writeTimeout(expecting_seq)
         break
       
       recv_header =  struct.unpack('!5H', message[:10])
@@ -138,18 +133,17 @@ if __name__ == '__main__':
             # print(f"window up: {cur_window}")
         else:
           # ReACK이라면
-          if processed == expecting_seq:
+          if processed == recv_seq:
+            cnt += 1
             continue
-          elif recv_seq == expecting_seq:
-            # ReACK이면서 expecting_Seq이면? timeout
-            log_handler.writeTimeout(expecting_seq)
+          elif recv_seq != expecting_seq:
+            # ReACK이면서 expecting_Seq이면? wrong seq num이지만
+            # timeout에 의한 wrong seq num일 수 있기 때문에 구분 할 수 없다
+            # 때문에 로그는 남기지 않고, 중복처리를 방지하기 위한 장치만 추가
             processed = recv_seq
-          else:
-            log_handler.writePkt(expecting_seq, log_handler.CORRUPTED)
-          break
+            continue
       else:
         # 데이터에 corrupt가 발생하면
-        print("말 안됨 ㄹㅇ")
         log_handler.writePkt(expecting_seq, log_handler.CORRUPTED)
         break
       
@@ -159,13 +153,6 @@ if __name__ == '__main__':
     while pos + shift < packet_len and window[pos+shift] == 1:
       shift += 1
     pos += shift
-  
-  segment = b''
-  fin = 1
-  header = struct.pack('!6H', src_port, dst_port, 0, window_size, fin, 0)
-  checksum = calculate_checksum(header+segment)
-  header = struct.pack('!6H', src_port, dst_port, 0, window_size, fin, checksum)
-  sender.sendto_bytes(header + segment, (dst_addr, dst_port))
 
   sock.close()
   log_handler.writeEnd()
