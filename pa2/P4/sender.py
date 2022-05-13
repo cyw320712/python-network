@@ -104,10 +104,6 @@ if __name__ == '__main__':
         # 떄문에 종료조건 set 후 break
         flag = True
         break
-      if (pos + cnt) >= packet_len:
-        # 여기서 멈추면 안되는 이유가
-        # 바로 멈추면 마지막 윈도우에서 loss 발생시 handling을 할 수 없음
-        continue
       try:
         message, addr = sock.recvfrom(1024)
         first = False
