@@ -16,7 +16,6 @@ window = []
 
 # pos 번째 packet만 전송
 def sendPacket(sender, pos, packet_len, dst, window_size):
-  # print(f"====sender====\n{window}")
   dst_addr = dst[0]
   dst_port = dst[1]
   sequence_size = window_size * 2 + 1
@@ -57,8 +56,6 @@ if __name__ == '__main__':
   except Exception:
     print("file not found")
     sys.exit(1)
-  # sock.bind((dst_addr, dst_port))
-
   file_data = file.read(PAYLOAD_SIZE)
   file_size = os.path.getsize(src_filename)
   packet_len = file_size // PAYLOAD_SIZE + 1
@@ -128,7 +125,6 @@ if __name__ == '__main__':
               window[pos+cnt+window_size] = -1
             sendPacket(sender, pos+cnt+window_size, packet_len, (dst_addr, 10090), window_size)
             cur_window += 1
-            # print(f"window up: {cur_window}")
         else:
           # ReACK이라면
           if processed == recv_seq:
