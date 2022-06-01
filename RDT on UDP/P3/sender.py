@@ -79,7 +79,7 @@ if __name__ == '__main__':
       timeout = False
       try:
         message, addr = sock.recvfrom(1024)
-      except TimeoutError:
+      except socket.timeout:
         # Timeout 된다면 log만 남기고 무시
         log_handler.writeTimeout(seq)
         timeout = True
