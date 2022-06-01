@@ -97,7 +97,7 @@ if __name__ == '__main__':
       try:
         message, addr = sock.recvfrom(1024)
         first = False
-      except TimeoutError:
+      except socket.timeout:
         # 이번 윈도우의 마지막 packet에 대한 recv 요청에서 timeout이 뜬다면
         break
       
